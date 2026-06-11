@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>네이버페이 취소 자동처리</title>
+  <style>
+    :root {
+      --green:   #03c75a;
+      --green-d: #02a84b;
+      --green-l: #e8faf1;
+      --bg:      #f0f4f8;
+      --surface: #ffffff;
+      --border:  #e4e9f0;
+      --text:    #1a202c;
+      --muted:   #718096;
+      --danger:  #e53e3e;
+      --warn:    #dd6b20;
+      --radius:  14px;
+      --shadow:  0 2px 16px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    /* ── 헤더 ── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar-logo {
+      width: 28px; height: 28px;
+      background: var(--green);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-size: 0.97em;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .topbar-spacer { flex: 1; }
+    .session-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.78em;
+      font-weight: 600;
+      background: #f7f8fa;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: default;
+    }
+    .session-badge.active {
+      background: var(--green-l);
+      border-color: #a8eac8;
+      color: #1a6b3c;
+    }
+    .badge-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #ccc;
+      flex-shrink: 0;
+    }
+    .badge-dot.on {
+      background: var(--green);
+      box-shadow: 0 0 0 2px #b2f0d2;
+    }
+    .btn-logout {
+      margin-left: 4px;
+      padding: 3px 9px;
+      font-size: 0.75em;
+      background: transparent;
+      border: 1px solid #c5d0db;
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-logout:hover { background: #f0f4f8; color: var(--text); }
+
+    /* ── 메인 레이아웃 ── */
+    .main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 700px) {
+      .main { grid-template-columns: 1fr; }
+    }
+
+    /* ── 패널 공통 ── */
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 16px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .panel-icon {
+      font-size: 16px;
+      width: 28px; height: 28px;
+      background: var(--green-l);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .panel-title {
+      font-size: 0.88em;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .panel-body { padding: 20px; }
+
+    /* ── 설정 폼 ── */
+    .field { margin-bottom: 18px; }
+    .field-label {
+      font-size: 0.8em;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .dt-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .dt-box {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 4px;
+      background: #f7f8fa;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .dt-box:focus-within {
+      border-color: var(--green);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(3,199,90,0.12);
+    }
+    .dt-box input[type=number] {
+      border: none; outline: none; background: transparent;
+      font-size: 0.9em; color: var(--text); text-align: center;
+      -moz-appearance: textfield; padding: 0; font-weight: 500;
+    }
+    .dt-box input[type=number]::-webkit-inner-spin-button,
+    .dt-box input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .dt-box input.i-month { width: 28px; }
+    .dt-box input.i-day   { width: 28px; }
+    .dt-box input[type=time] {
+      border: none; outline: none; background: transparent;
+      font-size: 0.9em; color: var(--text); padding: 0; width: 60px;
+      font-weight: 500;
+    }
+    .dt-unit { font-size: 0.75em; color: #aab; flex-shrink: 0; }
+    .dt-sep  { color: #d0d8e4; font-size: 0.8em; }
+
+    .btn-clear {
+      padding: 8px 13px;
+      background: #f7f8fa;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.8em;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .btn-clear:hover { background: #edf2f7; color: var(--text); }
+
+    .hint-text {
+      font-size: 0.77em;
+      color: #a0aec0;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+    .toggle-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px;
+      background: #f7f8fa;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: 18px;
+    }
+    .toggle-row:hover { border-color: #cbd5e0; background: #edf2f7; }
+    .toggle-row.active {
+      background: var(--green-l);
+      border-color: #a8eac8;
+    }
+    .toggle-row input[type=checkbox] {
+      width: 17px; height: 17px;
+      accent-color: var(--green);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .toggle-info { flex: 1; }
+    .toggle-label {
+      font-size: 0.85em;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .toggle-desc {
+      font-size: 0.76em;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .btn-run {
+      width: 100%;
+      padding: 14px;
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: 11px;
+      font-size: 0.97em;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: background 0.15s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-run:hover:not(:disabled) { background: var(--green-d); transform: translateY(-1px); }
+    .btn-run:active:not(:disabled) { transform: translateY(0); }
+    .btn-run:disabled { background: #b0bec5; cursor: not-allowed; transform: none; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .btn-run.running .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 로그 패널 ── */
+    .log-panel-head {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.76em;
+      font-weight: 600;
+      background: #edf2f7;
+      color: var(--muted);
+    }
+    .status-chip.running { background: #fff3e0; color: #e65100; }
+    .status-chip.done    { background: var(--green-l); color: #1a6b3c; }
+    .status-chip.error   { background: #fff5f5; color: var(--danger); }
+    .status-pulse {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .status-chip:not(.running) .status-pulse { animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .log-container {
+      background: #0d1117;
+      min-height: 400px;
+      max-height: 560px;
+      overflow-y: auto;
+      padding: 16px;
+      font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+      font-size: 0.8em;
+      line-height: 1.65;
+    }
+    .log-empty {
+      color: #4a5568;
+      text-align: center;
+      padding: 60px 20px;
+      font-size: 0.9em;
+      font-family: inherit;
+    }
+    .log-line { display: block; }
+    .log-line.ok     { color: #68d391; }
+    .log-line.err    { color: #fc8181; }
+    .log-line.warn   { color: #f6ad55; }
+    .log-line.info   { color: #76e4f7; }
+    .log-line.dim    { color: #4a5568; }
+    .log-line.normal { color: #cbd5e0; }
+    .log-ts { color: #4a5568; margin-right: 4px; }
+  </style>
+</head>
+<body>
+
+  <!-- 상단 바 -->
+  <header class="topbar">
+    <div class="topbar-logo">💚</div>
+    <span class="topbar-title">네이버페이 취소 자동처리</span>
+    <div class="topbar-spacer"></div>
+    <div class="session-badge" id="sessionBadge">
+      <div class="badge-dot" id="sessionDot"></div>
+      <span id="sessionText">확인 중...</span>
+      <button class="btn-logout" id="logoutBtn" style="display:none" onclick="logout()">세션 삭제</button>
+    </div>
+  </header>
+
+  <!-- 메인 -->
+  <div class="main">
+
+    <!-- 설정 패널 -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-icon">⚙️</div>
+        <span class="panel-title">실행 설정</span>
+      </div>
+      <div class="panel-body">
+        <form id="form">
+
+          <div class="field">
+            <div class="field-label">취소요청일 기준 (이 시각까지)</div>
+            <div class="dt-row">
+              <div class="dt-box">
+                <input type="number" class="i-month" placeholder="MM" min="1" max="12" id="reqTo_m">
+                <span class="dt-unit">월</span>
+                <span class="dt-sep">·</span>
+                <input type="number" class="i-day" placeholder="DD" min="1" max="31" id="reqTo_d">
+                <span class="dt-unit">일</span>
+                <span class="dt-sep">·</span>
+                <input type="time" step="60" id="reqTo_t">
+              </div>
+              <button type="button" class="btn-clear" onclick="clearDate()">비우기</button>
+            </div>
+            <p class="hint-text">비워두면 취소요청 전체를 처리합니다.</p>
+          </div>
+
+          <div class="divider"></div>
+
+          <label class="toggle-row" id="dryRunRow">
+            <input type="checkbox" id="dryRun" onchange="updateToggleStyle()">
+            <div class="toggle-info">
+              <div class="toggle-label">DRY RUN 모드</div>
+              <div class="toggle-desc">실제 처리 없이 매칭 건수만 확인</div>
+            </div>
+          </label>
+
+          <button type="submit" class="btn-run" id="runBtn">
+            <span class="spinner"></span>
+            <span id="runBtnText">▶ 실행</span>
+          </button>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- 로그 패널 -->
+    <div class="panel">
+      <div class="log-panel-head">
+        <div class="panel-icon">📋</div>
+        <span class="panel-title">실행 로그</span>
+        <div class="topbar-spacer"></div>
+        <div class="status-chip" id="statusChip">
+          <span class="status-pulse"></span>
+          <span id="statusText">대기 중</span>
+        </div>
+      </div>
+      <div class="log-container" id="logContainer">
+        <div class="log-empty" id="logEmpty">실행 버튼을 누르면 로그가 여기에 표시됩니다.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const YEAR = new Date().getFullYear();
+
+    function buildDatetime(mId, dId, tId) {
+      const m = document.getElementById(mId).value.trim();
+      const d = document.getElementById(dId).value.trim();
+      const t = document.getElementById(tId).value.trim();
+      if (!m || !d) return null;
+      const mm = String(m).padStart(2, '0');
+      const dd = String(d).padStart(2, '0');
+      const [hh, mn] = t ? t.split(':') : ['00', '00'];
+      return `${YEAR}-${mm}-${dd}T${hh}:${mn}`;
+    }
+
+    function clearDate() {
+      ['reqTo_m','reqTo_d','reqTo_t'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function updateToggleStyle() {
+      const row = document.getElementById('dryRunRow');
+      row.classList.toggle('active', document.getElementById('dryRun').checked);
+    }
+
+    async function checkSession() {
+      try {
+        const r = await fetch('/session');
+        const { hasProfile } = await r.json();
+        const dot    = document.getElementById('sessionDot');
+        const text   = document.getElementById('sessionText');
+        const badge  = document.getElementById('sessionBadge');
+        const logBtn = document.getElementById('logoutBtn');
+        if (hasProfile) {
+          dot.className    = 'badge-dot on';
+          text.textContent = '세션 저장됨';
+          badge.className  = 'session-badge active';
+          logBtn.style.display = '';
+        } else {
+          dot.className    = 'badge-dot';
+          text.textContent = '세션 없음';
+          badge.className  = 'session-badge';
+          logBtn.style.display = 'none';
+        }
+      } catch {
+        document.getElementById('sessionText').textContent = '연결 오류';
+      }
+    }
+
+    async function logout() {
+      if (!confirm('저장된 세션을 삭제합니다.\n다음 실행 시 다시 로그인이 필요합니다.')) return;
+      await fetch('/clear-session', { method: 'POST' });
+      checkSession();
+    }
+
+    checkSession();
+
+    function setStatus(text, cls) {
+      const chip = document.getElementById('statusChip');
+      chip.className = 'status-chip ' + (cls || '');
+      document.getElementById('statusText').textContent = text;
+    }
+
+    function logClass(line) {
+      if (/✅/.test(line))              return 'ok';
+      if (/❌|오류|Error/i.test(line))   return 'err';
+      if (/⚠️|warn/i.test(line))        return 'warn';
+      if (/──|══/.test(line))           return 'dim';
+      if (/로그인|Chrome|브라우저/i.test(line)) return 'info';
+      return 'normal';
+    }
+
+    let logLines = [];
+    function renderLog(logs) {
+      const container = document.getElementById('logContainer');
+      const empty     = document.getElementById('logEmpty');
+      if (!logs.length) return;
+      if (empty) empty.style.display = 'none';
+      for (let i = logLines.length; i < logs.length; i++) {
+        const raw = logs[i];
+        const tsMatch = raw.match(/^(\[\d{2}:\d{2}:\d{2}\])\s*(.*)/s);
+        const span = document.createElement('span');
+        span.className = 'log-line ' + logClass(raw);
+        if (tsMatch) {
+          span.innerHTML = `<span class="log-ts">${tsMatch[1]}</span>${escHtml(tsMatch[2])}`;
+        } else {
+          span.textContent = raw;
+        }
+        container.appendChild(span);
+        container.appendChild(document.createTextNode('\n'));
+      }
+      logLines = logs.slice();
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    const runBtn     = document.getElementById('runBtn');
+    const runBtnText = document.getElementById('runBtnText');
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const isDry = document.getElementById('dryRun').checked;
+      const data = {
+        payFrom: null, payTo: null, reqFrom: null,
+        reqTo:   buildDatetime('reqTo_m','reqTo_d','reqTo_t'),
+        dryRun:  isDry,
+      };
+
+      runBtn.disabled = true;
+      runBtn.classList.add('running');
+      runBtnText.textContent = isDry ? '분석 중...' : '처리 중...';
+      logLines = [];
+      document.getElementById('logContainer').innerHTML =
+        '<div class="log-empty" id="logEmpty" style="display:none"></div>';
+      setStatus('실행 중', 'running');
+
+      let resp;
+      try {
+        resp = await fetch('/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+      } catch (err) {
+        setStatus('연결 실패', 'error');
+        resetBtn();
+        return;
+      }
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        let msg = txt;
+        try { msg = JSON.parse(txt).error || txt; } catch {}
+        setStatus(msg, 'error');
+        resetBtn();
+        return;
+      }
+
+      const { id } = await resp.json();
+
+      const poll = async () => {
+        try {
+          const r = await fetch('/status?id=' + id);
+          if (r.ok) {
+            const s = await r.json();
+            renderLog(s.logs || []);
+            if (s.done) {
+              setStatus(
+                s.error ? '오류 발생' : (isDry ? 'DRY RUN 완료 ✅' : '처리 완료 ✅'),
+                s.error ? 'error' : 'done'
+              );
+              resetBtn();
+              checkSession();
+              return;
+            }
+          }
+        } catch {}
+        setTimeout(poll, 500);
+      };
+      poll();
+    });
+
+    function resetBtn() {
+      runBtn.disabled = false;
+      runBtn.classList.remove('running');
+      runBtnText.textContent = '▶ 실행';
+    }
+  </script>
+</body>
+</html>

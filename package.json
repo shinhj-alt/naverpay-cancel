@@ -1,0 +1,13 @@
+{
+  "name": "naverpay-cancel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "네이버페이 결제센터 취소요청 자동 처리 (웹 UI + Playwright)",
+  "scripts": {
+    "start": "node index.js",
+    "install-browser": "node install-browser.js"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}

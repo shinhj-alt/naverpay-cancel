@@ -347,20 +347,19 @@
         <form id="form">
 
           <div class="field">
-            <div class="field-label">취소요청일 기준 (이 시각까지)</div>
+            <div class="field-label">오늘 취소요청 마감 시각</div>
             <div class="dt-row">
               <div class="dt-box">
-                <input type="number" class="i-month" placeholder="MM" min="1" max="12" id="reqTo_m">
-                <span class="dt-unit">월</span>
+                <span class="dt-unit" style="color:var(--muted);font-size:0.82em;white-space:nowrap" id="todayLabel"></span>
                 <span class="dt-sep">·</span>
-                <input type="number" class="i-day" placeholder="DD" min="1" max="31" id="reqTo_d">
-                <span class="dt-unit">일</span>
-                <span class="dt-sep">·</span>
-                <input type="time" step="60" id="reqTo_t">
+                <input type="number" id="reqTo_h" placeholder="00" min="0" max="23" style="width:36px">
+                <span class="dt-unit">시</span>
+                <input type="number" id="reqTo_m" placeholder="00" min="0" max="59" style="width:36px">
+                <span class="dt-unit">분</span>
               </div>
-              <button type="button" class="btn-clear" onclick="clearDate()">비우기</button>
+              <button type="button" class="btn-clear" onclick="clearTime()">비우기</button>
             </div>
-            <p class="hint-text">비워두면 취소요청 전체를 처리합니다.</p>
+            <p class="hint-text">오늘 이 시각 이전 취소요청만 처리합니다. 비워두면 전체 처리.</p>
           </div>
 
           <div class="divider"></div>
@@ -401,21 +400,30 @@
   </div>
 
   <script>
-    const YEAR = new Date().getFullYear();
+    // 오늘 날짜 레이블 표시
+    (function() {
+      const now = new Date();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      document.getElementById('todayLabel').textContent = `오늘 (${mm}/${dd})`;
+    })();
 
-    function buildDatetime(mId, dId, tId) {
-      const m = document.getElementById(mId).value.trim();
-      const d = document.getElementById(dId).value.trim();
-      const t = document.getElementById(tId).value.trim();
-      if (!m || !d) return null;
-      const mm = String(m).padStart(2, '0');
-      const dd = String(d).padStart(2, '0');
-      const [hh, mn] = t ? t.split(':') : ['00', '00'];
-      return `${YEAR}-${mm}-${dd}T${hh}:${mn}`;
+    function buildReqTo() {
+      const h = document.getElementById('reqTo_h').value.trim();
+      const m = document.getElementById('reqTo_m').value.trim();
+      if (h === '' && m === '') return null;
+      const hh = String(Number(h) || 0).padStart(2, '0');
+      const mm = String(Number(m) || 0).padStart(2, '0');
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mo   = String(now.getMonth() + 1).padStart(2, '0');
+      const dd   = String(now.getDate()).padStart(2, '0');
+      return `${yyyy}-${mo}-${dd}T${hh}:${mm}`;
     }
 
-    function clearDate() {
-      ['reqTo_m','reqTo_d','reqTo_t'].forEach(id => document.getElementById(id).value = '');
+    function clearTime() {
+      document.getElementById('reqTo_h').value = '';
+      document.getElementById('reqTo_m').value = '';
     }
 
     function updateToggleStyle() {
@@ -505,7 +513,7 @@
       const isDry = document.getElementById('dryRun').checked;
       const data = {
         payFrom: null, payTo: null, reqFrom: null,
-        reqTo:   buildDatetime('reqTo_m','reqTo_d','reqTo_t'),
+        reqTo:   buildReqTo(),
         dryRun:  isDry,
       };
 
